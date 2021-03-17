@@ -1,0 +1,263 @@
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <title>Bamboo Ninja</title>
+  <meta charset="utf-8">
+  <style>
+    * {
+      margin: 0;
+    }
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+<script src="https://kaboomjs.com/lib/master/kaboom.js"></script>
+<script src="https://kaboomjs.com/lib/master/kit/physics.js"></script>
+<script src="https://kaboomjs.com/lib/master/kit/starter.js"></script>
+<script src="https://kaboomjs.com/lib/master/kit/level.js"></script>
+
+  <script>kaboom.import();</script>
+  <script>
+loadSprite("authorNames", "sprites/authorNames.png");
+loadSprite("bamboo", "sprites/bamboo.png");
+loadSprite("bambooNinja", "sprites/bambooNinja.png");
+loadSprite("bambooNinja1", "sprites/bambooNinja1.png");
+loadSprite("mainMenu", "sprites/mainMenu.png");
+loadSprite("startButton", "sprites/startButton.png");
+loadSprite("test", "sprites/test.kbmsprite");
+
+init({
+  width: false ? window.innerWidth / 2 : 240,
+  height: false ? window.innerHeight / 2 : 240,
+  scale: 2,
+});
+scene("endScreen", (args = {}) => {
+add([
+	text("You've Been Bamboozled!", 10),
+	pos(width()/2, height()/2-5),
+]);
+add([
+	text("Score: " + args.score , 10),
+	pos(width()/2, height()/2+5),
+])
+
+});
+scene("main", (args = {}) => {
+// kaboom.debug.showArea = true;
+// kaboom.debug.hoverInfo = true;
+
+layers([
+	"bg",					// background layer
+	"game", 			// foreground layer
+	"transition", // overlay transition layer
+], "game");
+
+// calculate the ratio of the background in order to cover
+const bgRatio = () => {
+	imgW = 120;
+	imgH = 120;	
+	if(width() > height() || width() == height)return width()/imgW;
+	else return height()/imgH;
+}
+
+add([
+	sprite("mainMenu"),
+	pos(width()/2, height()/2),
+	scale(bgRatio(),bgRatio()),
+	layer("bg"),
+	color(.95,.95,.95)
+])
+console.log(width());
+
+// animated transition expanding from center out
+const expandOut = (callback) => {
+	const movingRect = add([
+		rect(0,0),
+		pos(width()/2, height()/2),
+		color(0,0,0,1),
+		layer("transition"),
+	]);
+	const steps = 60;
+	const waitSecs = 0.5;
+  const transitionTime = 1;
+	// const stepW = width()/steps;
+	// const stepH = height()/steps;
+	let inTransition = false;
+  let elapsedTime = 0;
+	movingRect.action(() => {
+		// console.log(dt()/transitionTime*width());
+		if(elapsedTime >= transitionTime && !inTransition){
+			wait(waitSecs, callback)
+			inTransition = true;
+      return;
+		}
+    elapsedTime += dt();
+    let stepW = dt()/transitionTime*width();
+    let stepH = dt()/transitionTime*height();
+		movingRect.width += stepW;
+		movingRect.height += stepH;
+	});
+	
+}
+
+var shiftFromCenter = 75;
+
+// Draw the Title
+const title = add([
+	// text("Choppy Shoot!", 20),
+	sprite("bambooNinja"),
+	// color(.8,.9,.8),
+	scale(1.5,1.5),
+	pos(width()/2, (height()/2)-30),
+	layer("game"),
+]);
+
+const names = add([
+	sprite("authorNames"),
+	pos(45,height()-15),
+	layer("game"),
+])
+
+
+// Positioning for the center of the startButton
+const buttonCenter = pos(width()/2,(height()/2)+shiftFromCenter)
+
+// Draw the startButton
+const startButton = add([
+	// rect(100, 30),
+	sprite("startButton"),
+	buttonCenter,
+	scale(1.5,1.5),
+	layer("game"),
+]);
+
+
+
+mouseClick(() => {
+	let m = mousePos();
+	if(startButton.hasPt(m)){
+		expandOut(() => {
+			go("mainGame");
+		})
+	}
+});
+
+// bypass main screen for testing purposes
+// go("mainGame");
+});
+scene("mainGame", (args = {}) => {
+const MAX_SEGMENTS = 7;
+const BAMBOO_HEIGHT = 32;
+const MAX_OFFSET = 5;
+const MAX_CHANCE = 1 / 0.075;
+const CURVE_WIDTH_SCALE = 75;
+
+const MAX_HEIGHT = height() - MAX_OFFSET;
+let numChops = 0;
+
+const getChance = () => {
+	return numChops < CURVE_WIDTH_SCALE / 2 
+		?(2 ** (8 * numChops / CURVE_WIDTH_SCALE - 4)) / (2 * MAX_CHANCE) 
+		: (2 - 2 ** (-8 * /*this.numClicks*/numChops / CURVE_WIDTH_SCALE + 4)) / (2 * MAX_CHANCE);
+}
+
+class Shoot {
+	constructor(xpos) {
+		this.xpos = xpos;
+    this.numClicks = 0;
+		this.currentScaleY = 1
+		this.scaleBamboo();
+    this.sprites = [];
+    this.addSegment();
+	}
+	scaleBamboo() {
+		if(MAX_HEIGHT/MAX_SEGMENTS > BAMBOO_HEIGHT){
+			this.currentScaleY = (MAX_HEIGHT/MAX_SEGMENTS)/BAMBOO_HEIGHT;
+		}
+	}
+
+  addSegment() {
+    this.sprites.push(add([
+      sprite("bamboo"),
+      scale(2,this.currentScaleY),
+      pos(this.xpos, height() - (BAMBOO_HEIGHT * this.currentScaleY * (this.sprites.length))),
+      origin("bot")
+    ]));
+  }
+	grow() {
+		this.addSegment();
+	}
+	tick() {
+    if (this.sprites.reduce((acc, next) => acc || next.isClicked(), false)) {
+      // this.numClicks++;
+			
+      this.trim();
+    }
+    if (chance(getChance()))
+      this.grow();
+	}
+	trim() {
+		if (this.sprites.length > 1) {
+			destroy(this.sprites.pop());
+			numChops++;
+		}
+  }
+	// get maxHeight() {
+	// 	return (Math.ceil(height()/segmentHeight))
+	// }
+}
+
+const debug = x => {
+	console.log(x);
+	return x;
+}
+
+let shoots = Array(5)
+							.fill(null)
+							.map((_, i) => new Shoot( width() / 2 - 96 + i * 48) );
+
+add(["shoot-manager"]);
+action("shoot-manager", _ => {
+	shoots.forEach(shoot => {
+		shoot.tick();
+		if(shoot.sprites.length > MAX_SEGMENTS) {
+			go("endScreen", {
+				win: false,
+				score: numChops,
+			});
+		};
+	});
+});
+
+});
+scene("tutorial", (args = {}) => {
+layers([
+	"bg",
+	"fg0",
+	"fg1",
+	"fg2",
+	"fg3",
+	"fg4",
+])
+const firstPage = () => {
+	
+}
+});
+start("main");
+
+  </script>
+</body>
+
+</html>
