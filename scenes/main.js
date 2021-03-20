@@ -4,25 +4,21 @@
 layers([
 	"bg",					// background layer
 	"game", 			// foreground layer
+  "ui",         // ui layer
 	"transition", // overlay transition layer
 ], "game");
 
-// calculate the ratio of the background in order to cover
-const bgRatio = () => {
-	imgW = 120;
-	imgH = 120;	
-	if(width() > height() || width() == height)return width()/imgW;
-	else return height()/imgH;
-}
+getSprite("volume").slice(2, 1);
 
 add([
 	sprite("mainMenu"),
 	pos(width()/2, height()/2),
-	scale(bgRatio(),bgRatio()),
+	scale(2,2),
 	layer("bg"),
 	color(.95,.95,.95)
-])
-console.log(width());
+]);
+
+// console.log(width());
 
 // animated transition expanding from center out
 const expandOut = (callback) => {
@@ -55,8 +51,6 @@ const expandOut = (callback) => {
 	
 }
 
-var shiftFromCenter = 75;
-
 // Draw the Title
 const title = add([
 	// text("Choppy Shoot!", 20),
@@ -69,13 +63,30 @@ const title = add([
 
 const names = add([
 	sprite("authorNames"),
-	pos(45,height()-15),
+	pos(width()-45,height()-15),
 	layer("game"),
 ])
 
+const volumeButton = add([
+  sprite("volume"),
+  layer("ui"),
+  scale(2, 2),
+  origin("topright"),
+  pos(width() - 4, 4)
+]);
+volumeButton.frame = 1;
+volumeButton.clicks(() => {
+  volumeButton.frame = +!volumeButton.frame;
+  volume(!volume())
+});
+
 
 // Positioning for the center of the startButton
-const buttonCenter = pos(width()/2,(height()/2)+shiftFromCenter)
+const buttonCenter = pos(width()/2,(height()/2)+75)
+
+play("bambooninja", {
+  loop: true
+});
 
 // Draw the startButton
 const startButton = add([
